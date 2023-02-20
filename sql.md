@@ -1,9 +1,7 @@
 # Queries and Thoughts
-We will create two CSV's. One containing flights that were on time or early and one containing flights that are late.
+We will create two CSV's. One containing flights that were on time or early and one containing flights that are delayed.
 ```SQL
-SELECT * FROM 
-(   
-    SELECT
+SELECT
     fl_date,
     mkt_unique_carrier,
     mkt_carrier_fl_num,
@@ -17,14 +15,11 @@ SELECT * FROM
     crs_elapsed_time,
     distance,
     (arr_delay + dep_delay) 
-    AS total_delay
-    FROM flights
-    WHERE arr_delay + dep_delay > 0 AND arr_delay + dep_delay < 301
-)
-AS sub_query
-WHERE fl_date LIKE '2019-01%'
+AS total_delay
+FROM flights
+WHERE fl_date LIKE '2019-01%' and arr_delay + dep_delay > 0 AND arr_delay + dep_delay < 301
 ORDER BY fl_date ASC
-LIMIT 100000
+LIMIT 100000;
 ```
 This is the main query. To get flights on time we can change the first where statement to be:
 ```SQL
