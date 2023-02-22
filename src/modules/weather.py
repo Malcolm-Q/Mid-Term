@@ -4,10 +4,10 @@ from os import environ
 
 url = 'https://api.worldweatheronline.com/premium/v1/past-weather.ashx'
 
-estimated_response_time = 0.4
+estimated_response_time = 0.6
 
 
-def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 'WORLD_WEATHER_API', rotate = False, additional_keys=['WORLD_WEATHER_API2','WORLD_WEATHER_API3','WORLD_WEATHER_API4'], return_clean=True):
+def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 'WORLD_WEATHER_API', rotate = False, additional_keys=['WORLD_WEATHER_API2','WORLD_WEATHER_API3','WORLD_WEATHER_API4','WORLD_WEATHER_API5','WORLD_WEATHER_API6'], return_clean=True):
     '''
     Uses world weather online API to get daily weather descriptor for date and city.
         Parameters:
@@ -28,23 +28,26 @@ def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 
     distinct_df = df.drop_duplicates()
     distinct_df.columns = ['city','date']
     df.columns = ['city','date']
-    dates = distinct_df.date.values
-    cities = distinct_df.city.values
+    dates = distinct_df.date
+    cities = distinct_df.city.value_counts().index
     key_num = -1
     break_for = False
 
-    print('number of requests:',len(dates))
-    print('Estimated execution time:',estimated_response_time * len(dates),'seconds')
+    print('number of requests:',len(cities))
+    print('Estimated execution time:',estimated_response_time * len(cities),'seconds')
     if estimated_response_time * len(dates) > 1800: print('Better grab a coffee...')
+    start_date = dates.value_counts().sort_index().index[0]
+    end_date = dates.value_counts().sort_index().index[-1]
 
     weather_df = pd.DataFrame(columns=['city','date','weather'])
-    for i in range(start_at,len(dates)):
+    for i in range(start_at,len(cities)):
         if(rotate):
             loop = True
             while loop:
                 params = {
                 'key' : key,
-                'date' : dates[i],
+                'date' : start_date,
+                'enddate':end_date,
                 'q' : cities[i],
                 'tp' : '24',
                 'format':'json'
@@ -57,50 +60,55 @@ def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 
                 
 
                 try: 
-                    weather = response['data']['weather'][0]['hourly'][0]['weatherDesc'][0]['value']
-                    tmp = {
-                    'city':cities[i],
-                    'date':dates[i],
-                    'weather': weather
-                    }
-                    weather_df = pd.concat([weather_df,pd.DataFrame([tmp])])
+                    for resp in response['data']['weather']:
+                        tmp = {
+                            'city':cities[i],
+                            'date':resp['date'],
+                            'weather':resp['hourly'][0]['weatherDesc'][0]['value']
+                        }
+                        weather_df = pd.concat([weather_df,pd.DataFrame([tmp])])
                     loop = False
                 except:
                     if key_num +1 < len(additional_keys):
-                        print(f"KEY NUMBER {key_num} MAXED OUT\nTRYING NEXT KEY...")
+                        print(f"KEY NUMBER {key_num+1} MAXED OUT\nTRYING NEXT KEY...")
                         key_num+=1
                         key = environ[additional_keys[key_num]]
                     else:
-                        print(f"ALL KEYS MAXED AT LINE {i+1} \n~BREAKING AND SAVING~")
+                        print(f"ALL KEYS MAXED AT LINE {i} \n~BREAKING AND SAVING~")
                         save = True
                         break_for = True
                         loop = False
         else:
             params = {
             'key' : key,
-            'date' : dates[i],
+            'date' : start_date,
+            'enddate':end_date,
             'q' : cities[i],
             'tp' : '24',
             'format':'json'
             }
-            response = requests.get(url=url,params=params).json()
+            while(True):
+                try:
+                    response = requests.get(url=url,params=params).json()
+                    break
+                except: 'JSON DECODE ERROR'
 
-            try: weather = response['data']['weather'][0]['hourly'][0]['weatherDesc'][0]['value']
+            try: 
+                for resp in response['data']['weather']:
+                    tmp = {
+                        'city':cities[i],
+                        'date':resp['date'],
+                        'weather':resp['hourly'][0]['weatherDesc'][0]['value']
+                    }
+                    weather_df = pd.concat([weather_df,pd.DataFrame([tmp])])
             except:
                 print(f"API DAILY LIMIT HIT AT LINE {i} \n~BREAKING AND SAVING~")
                 save = True
                 break
 
-            tmp = {
-                'city':cities[i],
-                'date':dates[i],
-                'weather': weather
-            }
-
-            weather_df = pd.concat([weather_df,pd.DataFrame([tmp])])
         if break_for: break
     
-    merged_df = pd.merge(df,weather_df,left_on=['city','date'],right_on=['city','date'],how='outer')
+    merged_df = pd.merge(df,weather_df,left_on=['city','date'],right_on=['city','date'])
 
     if save: merged_df.weather.to_csv('../data/weather/'+prefix+'weather_data.csv')
 
@@ -108,6 +116,7 @@ def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 
     else: return merged_df.weather
 
     
+
 
 def check_weather(df):
     assert len(df) != 0, 'Do not call function with an empty dataframe. \ntry "harvest_weather_data(df[["origin_city_name","fl_date"]])'
