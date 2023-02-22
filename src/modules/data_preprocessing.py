@@ -3,11 +3,13 @@ import pandas as pd
 import numpy as np
 import importlib.util
 
-def clean_raw(overwrite = False, feather = True, strip = True, caps = True,take_hour = True, day_of_week=True, week_int = True, one_hot = False, drop = tuple()):
+def clean_raw(path = '../data/raw_data/*',save_path = '../data/preprocessed_data/',overwrite = False, feather = True, strip = True, caps = True,take_hour = True, day_of_week=True, week_int = True, drop = tuple()):
     '''
     Cleans CSVs in 'data/raw_data' and converts to feather.
 
         Parameters:
+            path (str): path to grab raw files from.
+            save_path (str): path to save to.
             overwrite (bool): overwrite data in '/preprocessed_data'.
             feather (bool): use .feather files, otherwise use CSVs.
             strip (bool): use .strip() on objects.
@@ -15,14 +17,13 @@ def clean_raw(overwrite = False, feather = True, strip = True, caps = True,take_
             take_hour (bool): only keep the hour from times.
             day_of_week (bool): only keep dt.dayofweek from dates.
             week_int (bool): If True, dayofweek is numeric.
-            one_hot (bool): call pd.get_dummies() EXPENSIVE
             drop (tuple): clean_raw(drop=(1,2)) will drop the 2nd and 3rd column.
         Returns:
             status (str): progress updates.
             (Saves cleaned files in data/preprocessed_data)
     '''
-    all_raw = glob.glob('../data/raw_data/*')
-    check_clean(all_raw,overwrite,feather)
+    all_raw = glob.glob(path)
+    check_clean(all_raw,overwrite,feather,save_path)
 
     for i,raw_file in enumerate(all_raw):
         cleaner = pd.read_csv(raw_file)
@@ -43,32 +44,24 @@ def clean_raw(overwrite = False, feather = True, strip = True, caps = True,take_
             for col in cleaner.select_dtypes('object'):
                 cleaner[col] = cleaner[col].str.strip()
                 if(caps): cleaner[col] = cleaner[col].str.upper()
-
-        # This will add many many dimensions. Only use if nescessary.
-        if(one_hot):
-            cleaner = pd.get_dummies(cleaner,dtype=np.int8)
         
         # drop specified columns
         if(len(drop) > 0):
             for col in drop:
                 cleaner.drop(cleaner.columns[col],inplace=True,axis=1)
-        
-
-        
-
 
         # Save file and format name
         if(i > 11):
             month = str(i - 11)
             if(len(month) != 2): month = '0' + month
-            if feather: cleaner.to_feather('../data/preprocessed_data/on_time_'+month+'.feather')
-            else: cleaner.to_csv('../data/preprocessed_data/on_time_'+month+'.csv')
+            if feather: cleaner.to_feather(save_path + 'on_time_'+month+'.feather')
+            else: cleaner.to_csv(save_path + 'on_time_'+month+'.csv')
             print('on time flights for month:',month)
         else:
             month = str(i + 1)
             if(len(month) != 2): month = '0' + month
-            if feather: cleaner.to_feather('../data/preprocessed_data/delayed_'+month+'.feather')
-            else: cleaner.to_csv('../data/preprocessed_data/delayed_'+month+'.csv')
+            if feather: cleaner.to_feather(save_path + 'delayed_'+month+'.feather')
+            else: cleaner.to_csv(save_path + 'delayed_'+month+'.csv')
             print('delayed flights for month:',month)
     del all_raw
     return 'complete'
@@ -177,16 +170,16 @@ def check_loader(all_data,months,feather):
     if(feather): assert all_data[0][-1] == 'r','File is not .feather did you mean to pass feather = False?'
     else: assert all_data[0][-1] != 'r', 'File is not .csv did you mean to pass feather = True?'
 
-def check_clean(all_raw, overwrite,feather):
+def check_clean(all_raw, overwrite,feather, save_path):
     if feather:
         spec = importlib.util.find_spec('pyarrow')
         assert spec is not None, "pyarrow is not installed, Conda install pyarrow or use 'feather=False'"
 
-    test = glob.glob('../data/preprocessed_data/*')
+    test = glob.glob(save_path + '*')
     if len(test) != 0:
-        assert overwrite, "data already exists (../data/preprocessed_data) use 'overwrite=True' to overwrite"
+        assert overwrite, "data already exists ("+ save_path + ") use 'overwrite=True' to overwrite"
 
-    assert len(all_raw) == 24,'raw data files have been tampered with. There should be 24.'
+    #assert len(all_raw) == 24,'raw data files have been tampered with. There should be 24.'
 
 def get_hour(n):
     if(len(str(n))) == 4:
