@@ -1,13 +1,13 @@
 import requests
 import pandas as pd
 from os import environ
-
+import time
 url = 'https://api.worldweatheronline.com/premium/v1/past-weather.ashx'
 
-estimated_response_time = 0.6
+estimated_response_time = 0.64
 
 
-def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 'WORLD_WEATHER_API', rotate = False, additional_keys=['WORLD_WEATHER_API2','WORLD_WEATHER_API3','WORLD_WEATHER_API4','WORLD_WEATHER_API5','WORLD_WEATHER_API6'], return_clean=True):
+def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 'WORLD_WEATHER_API', rotate = False, additional_keys=['WORLD_WEATHER_API7','WORLD_WEATHER_API3','WORLD_WEATHER_API4','WORLD_WEATHER_API5','WORLD_WEATHER_API6','WORLD_WEATHER_API2'], return_clean=True):
     '''
     Uses world weather online API to get daily weather descriptor for date and city.
         Parameters:
@@ -32,10 +32,11 @@ def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 
     cities = distinct_df.city.value_counts().index
     key_num = -1
     break_for = False
+    print(df.columns,distinct_df.columns)
 
     print('number of requests:',len(cities))
     print('Estimated execution time:',estimated_response_time * len(cities),'seconds')
-    if estimated_response_time * len(dates) > 1800: print('Better grab a coffee...')
+    if estimated_response_time * len(cities) > 1800: print('Better grab a coffee...')
     start_date = dates.value_counts().sort_index().index[0]
     end_date = dates.value_counts().sort_index().index[-1]
 
@@ -73,6 +74,7 @@ def harvest_weather_data(df,save = False, prefix ='tmp',start_at = 0, env_key = 
                         print(f"KEY NUMBER {key_num+1} MAXED OUT\nTRYING NEXT KEY...")
                         key_num+=1
                         key = environ[additional_keys[key_num]]
+                        time.sleep(2)
                     else:
                         print(f"ALL KEYS MAXED AT LINE {i} \n~BREAKING AND SAVING~")
                         save = True
@@ -137,4 +139,40 @@ def clean_weather(series):
     series[series.str.contains('fog')] = 'rain'
     series[series.str.contains('mist')] = 'rain'
 
+    return series
+
+def light_clean(series):
+    series = series.str.lower()
+    series[series.str.contains('moderate or heavy snow showers')] = 'heavy snow'
+    series[series.str.contains('mist')] = 'light drizzle'
+    series[series.str.contains('patchy light rain with thunder')] = 'light rain'
+    series[series.str.contains('moderate or heavy snow with thunder')] = 'heavy snow'
+    series[series.str.contains('moderate or heavy sleet showers')] = 'heavy snow'
+    series[series.str.contains('patchy light snow with thunder')] = 'light snow'
+    series[series.str.contains('light sleet showers')] = 'light snow'
+    series[series.str.contains('blizzard')] = 'heavy snow'
+    series[series.str.contains('ice pellets')] = 'moderate snow'
+    series[series.str.contains('freezing fog')] = 'moderate snow'
+    series[series.str.contains('patchy light snow with thunder')] = 'light snow'
+    series[series.str.contains('moderate or heavy showers of ice pellets')] = 'heavy snow'
+    series[series.str.contains('patchy sleet possible')] = 'light snow'
+    series[series.str.contains('heavy freezing drizzle')] = 'heavy snow'
+    series[series.str.contains('moderate or heavy sleet')] = 'heavy snow'
+    series[series.str.contains('moderate or heavy rain at times')] = 'moderate rain'
+    series[series.str.contains('light snow showers')] = 'light snow'
+    series[series.str.contains('light freezing rain')] = 'light snow'
+    series[series.str.contains('patchy snow possible')] = 'light snow'
+    series[series.str.contains('patchy heavy snow')] = 'moderate snow'
+    series[series.str.contains('torrential rain shower')] = 'heavy rain'
+    series[series.str.contains('blowing snow')] = 'moderate snow'
+    series[series.str.contains('moderate or heavy freezing rain')] = 'heavy snow'
+    series[series.str.contains('moderate rain at times')] = 'moderate rain'
+    series[series.str.contains('light sleet')] = 'light snow'
+    series[series.str.contains('patchy moderate snow')] = 'moderate snow'
+    series[series.str.contains('moderate or heavy rain shower')] = 'heavy rain'
+    series[series.str.contains('fog')] = 'moderate rain'
+    series[series.str.contains('patchy light snow')] = 'light snow'
+    series[series.str.contains('patchy light rain')] = 'light rain'
+    series[series.str.contains('patchy light drizzle')] = 'light rain'
+    series[series.str.contains('moderate or heavy rain with thunder')] = 'heavy rain'
     return series
